@@ -187,10 +187,6 @@ namespace seg {
         int id;
         cv::Rect bbox;
     };
-
-    struct SocketData {
-        
-    };
 }
 
 #endif // SEGMENT_NORMAL_COMMON_HPP

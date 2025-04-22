@@ -5,11 +5,19 @@
 
 using namespace sl;
 
+sl::Camera* ZEDCustomManager::m_ZedCamera = new sl::Camera();;
+sl::InitParameters ZEDCustomManager::m_InitParams = sl::InitParameters();
+sl::RuntimeParameters ZEDCustomManager::m_RuntimeParams = sl::RuntimeParameters();
+sl::Mat* ZEDCustomManager::m_LeftMat = nullptr;
+
+int ZEDCustomManager::m_ImageWidth = 0;
+int ZEDCustomManager::m_ImageHeight = 0;
+
 ZEDCustomManager::ZEDCustomManager() {
-    m_ZedCamera = nullptr;
-    m_LeftMat = nullptr;
-    m_ImageWidth = 0;
-    m_ImageHeight = 0;
+    //m_ZedCamera = nullptr;
+    //m_LeftMat = nullptr;
+    //m_ImageWidth = 0;
+    //m_ImageHeight = 0;
 }
 
 sl::Camera* ZEDCustomManager::getCamera() {
@@ -24,6 +32,7 @@ cv::Mat ZEDCustomManager::getCurrentMat() {
 bool ZEDCustomManager::InitializeZEDCamera() {
     // Create the camera instance if not already created.
     if (!m_ZedCamera) {
+        std::cout << "Should make new right??" << std::endl;
         m_ZedCamera = new sl::Camera();
     }
 
@@ -76,7 +85,7 @@ bool ZEDCustomManager::InitializeZEDCamera() {
 
     // Create the left image Mat if it hasn't been created.
     if (!m_LeftMat) {
-        m_LeftMat = new Mat(m_ImageWidth, m_ImageHeight, MAT_TYPE::U8_C4, MEM::CPU);
+        m_LeftMat = new sl::Mat(m_ImageWidth, m_ImageHeight, MAT_TYPE::U8_C4, MEM::CPU);
     }
 
     return 0;
@@ -93,7 +102,10 @@ bool ZEDCustomManager::CaptureFrame() {
         std::cerr << "Failed to grab frame: " << (int)state << std::endl;
         return 1;
     }
-    m_ZedCamera->retrieveImage(*m_LeftMat, VIEW::LEFT);
+    sl::ERROR_CODE err = m_ZedCamera->retrieveImage(*m_LeftMat, VIEW::LEFT);
+    if (err != ERROR_CODE::SUCCESS) {
+        std::cerr << "Failed to retrieve image from camera" << std::endl;
+    }
     return 0;
 }
 

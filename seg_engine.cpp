@@ -58,10 +58,6 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
 
         tmpMaskPre.mask = obj.boxMask;
 
-        //if (obj.label == 0) {
-            //cv::imshow("raw mask", obj.boxMask);
-        //}
-
         tmp.is_grounded = (obj.label == 0);
         cvMat2slMat(obj.boxMask).copyTo(tmp.box_mask, sl::COPY_TYPE::CPU_CPU);
 
@@ -96,8 +92,9 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
                 8 * sizeof(sl::float3));
         }
         else {
-            std::cout << "Issue creating 3d bb data array" << std::endl;
-            return -1;
+            LogStatement("Skipping id=" + std::to_string(objects.object_list[i].id) +
+                " (got " + std::to_string(objects.object_list.at(i).bounding_box.size()) + " corners)\n");
+            continue;
         }
 
         detectedObjects.push_back(tmpObject);

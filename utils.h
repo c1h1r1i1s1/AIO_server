@@ -155,6 +155,50 @@ inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat in
     return final3ChMask;
 }
 
+inline seg::float3 ComputeCenter(const seg::float3 corners[8]) {
+    seg::float3 min = corners[0];
+    seg::float3 max = corners[0];
+
+    for (int i = 1; i < 8; ++i) {
+        if (corners[i].x < min.x) min.x = corners[i].x;
+        if (corners[i].y < min.y) min.y = corners[i].y;
+        if (corners[i].z < min.z) min.z = corners[i].z;
+
+        if (corners[i].x > max.x) max.x = corners[i].x;
+        if (corners[i].y > max.y) max.y = corners[i].y;
+        if (corners[i].z > max.z) max.z = corners[i].z;
+    }
+
+    seg::float3 center;
+    center.x = (min.x + max.x) / 2000.0f;
+    center.y = (min.y + max.y) / 2000.0f;
+    center.z = (min.z + max.z) / 2000.0f;
+
+    return center;
+}
+
+inline seg::float3 ComputeSize(const seg::float3 corners[8]) {
+    seg::float3 min = corners[0];
+    seg::float3 max = corners[0];
+
+    for (int i = 1; i < 8; ++i) {
+        if (corners[i].x < min.x) min.x = corners[i].x;
+        if (corners[i].y < min.y) min.y = corners[i].y;
+        if (corners[i].z < min.z) min.z = corners[i].z;
+
+        if (corners[i].x > max.x) max.x = corners[i].x;
+        if (corners[i].y > max.y) max.y = corners[i].y;
+        if (corners[i].z > max.z) max.z = corners[i].z;
+    }
+
+    seg::float3 size;
+    size.x = (max.x - min.x) / 1000.0f; // width
+    size.y = (max.y - min.y) / 1000.0f; // height
+    size.z = (max.z - min.z) / 1000.0f; // depth
+
+    return size;
+}
+
 // This function assumes:
 // - RGB360 is a 360x640 RGB image from the ZED camera (after conversion) CV_32FC3
 // - boxMask is a CV_32FC3 binary (grayscale) mask from YOLO segmentation where the mask regions are non-zero
