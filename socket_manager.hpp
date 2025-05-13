@@ -16,7 +16,7 @@ class SocketManager {
         ~SocketManager();
         
         bool getPosConfirm();
-        void broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData);
+        void broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData, sl::Rotation rot, sl::Translation tran);
    
         void start();
         void stop();
@@ -29,6 +29,7 @@ private:
     static std::mutex posConfirmMutex;
 
     std::thread m_listenerThread;
+    us_listen_socket_t* m_listenSocket = nullptr;
     bool m_running;
 };
 

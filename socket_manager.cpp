@@ -72,8 +72,9 @@ void SocketManager::start() {
                 m_clients.erase(ws);
             }
         })
-        .listen(12345, [](auto* listenSocket) {
-            if (listenSocket) {
+        .listen(12345, [this](us_listen_socket_t* token) {
+            m_listenSocket = token;
+            if (m_listenSocket) {
                 std::cout << "Listening on port 12345" << std::endl;
             }
         })
@@ -95,16 +96,23 @@ void SocketManager::stop() {
         m_clients.clear();
     }
 
+    if (m_listenSocket) {
+        us_listen_socket_close(0, m_listenSocket);
+        m_listenSocket = nullptr;
+    }
+
     //// Signal the uWS event loop to stop, which causes run() to return.
-    uWS::Loop::get()->free();
+    //uWS::Loop::get()->stop();
 
     // If needed, join the listener thread in the destructor or here.
     if (m_listenerThread.joinable()) {
         m_listenerThread.join();
     }
+
+    uWS::Loop::get()->free();
 }
 
-void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData) {
+void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData, sl::Rotation rot, sl::Translation tran) {
     
     json boxData;
     boxData["boxes"] = json::array();
@@ -113,8 +121,18 @@ void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingB
         box["id"] = boxInstance.id;
         box["label"] = boxInstance.label;
 
-        seg::float3 center = ComputeCenter(boxInstance.bounding_box_3d);
-        seg::float3 size = ComputeSize(boxInstance.bounding_box_3d);
+        seg::float3 cornersCam[8];
+        ConvertCameraPose(boxInstance.bounding_box_3d, cornersCam, rot, tran);
+
+        //if (boxInstance.id == 0) {
+        //    LogStatement("About to drop some facts");
+        //    for (int i = 0; i < 8; ++i) {
+        //        LogStatement(std::to_string(cornersCam[i].z));
+        //    }
+        //}
+
+        seg::float3 center = ComputeCenter(cornersCam);
+        seg::float3 size = ComputeSize(cornersCam);
 
         box["x"] = center.x;
         box["y"] = center.y;

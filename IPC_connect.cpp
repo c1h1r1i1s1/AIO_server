@@ -2,7 +2,7 @@
 
 const size_t FP32_BLOB_SIZE = 1ull * 3 * 360 * 640 * sizeof(uint32_t);
 
-// Define shared memory and event names (without "Global\\" if not needed).
+// Define shared memory and event names
 const wchar_t* SHARED_MEMORY_NAME = L"InpaintingSharedMemory";
 const wchar_t* EVENT_INPUT_READY = L"InputReadyEvent";
 const wchar_t* EVENT_OUTPUT_READY = L"OutputReadyEvent";
@@ -16,7 +16,7 @@ IPC_connect::IPC_connect() {
         // Handle error as needed.
     }
     // Map shared memory into our address space.
-    pBuf = MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, FP32_BLOB_SIZE);
+    pBuf = MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, FP32_BLOB_SIZE*2);
     if (!pBuf) {
         std::wcerr << L"MapViewOfFile failed with error: " << GetLastError() << std::endl;
         // Handle error as needed.
@@ -44,15 +44,18 @@ IPC_connect::~IPC_connect() {
 
 // inpaintBlob: Sends an input FP32 blob and receives the processed FP32 blob.
 // Both inputBlob and outputBlob are expected to have a total size of FP32_BLOB_SIZE.
-bool IPC_connect::inpaintBlob(const cv::Mat& inputBlob, cv::Mat& outputBlob) {
+bool IPC_connect::inpaintBlob(const cv::Mat& inputBlob_L, const cv::Mat& inputBlob_R, cv::Mat& outputBlob_L, cv::Mat& outputBlob_R) {
     // Verify input blob size.
-    if (inputBlob.total() * inputBlob.elemSize() != FP32_BLOB_SIZE) {
+    if (inputBlob_L.total() * inputBlob_L.elemSize() != FP32_BLOB_SIZE) {
         LogStatement("Input blob size does not match expected FP32_BLOB_SIZE.");
         std::cerr << "Input blob size does not match expected FP32_BLOB_SIZE." << std::endl;
         return 1;
     }
+    
     // Copy input FP32 data into shared memory.
-    memcpy(pBuf, inputBlob.data, FP32_BLOB_SIZE);
+    auto* buf = reinterpret_cast<uint8_t*>(pBuf);
+    memcpy(buf, inputBlob_L.ptr<float>(), FP32_BLOB_SIZE);
+    memcpy(buf + FP32_BLOB_SIZE, inputBlob_R.ptr<float>(), FP32_BLOB_SIZE);
 
     // Signal the server that the input is ready.
     if (!SetEvent(hInputEvent)) {
@@ -69,10 +72,12 @@ bool IPC_connect::inpaintBlob(const cv::Mat& inputBlob, cv::Mat& outputBlob) {
         return 1;
     }
 
-    // Copy the output FP32 data from shared memory into outputBlob.
+    // Copy the output FP32 data from shared memory into outputBlobs.
     // Create a cv::Mat header for the output (same size and type).
-    outputBlob = cv::Mat(1, 3 * 360 * 640, CV_32F);
-    memcpy(outputBlob.data, pBuf, FP32_BLOB_SIZE);
+    outputBlob_L = cv::Mat(1, 3 * 360 * 640, CV_32F);
+    outputBlob_R = cv::Mat(1, 3 * 360 * 640, CV_32F);
+    memcpy(outputBlob_L.ptr<float>(), buf, FP32_BLOB_SIZE);
+    memcpy(outputBlob_R.ptr<float>(), buf + FP32_BLOB_SIZE, FP32_BLOB_SIZE);
 
     return 0;
 }

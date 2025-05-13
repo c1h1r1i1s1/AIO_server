@@ -13,20 +13,23 @@ public:
 	bool InitialiseEngines();
 	int ProcessFrame(ZEDCustomManager* zedCustomManager);
 	std::vector<DetectedObject> GetObjects() const;
-	void getSegFrame();
 	bool ErasePrivateObject(int id);
 	bool ShowPrivateObject(int id);
 	bool ClearRemovals();
-	cv::Mat InpaintFrame();
+	std::vector<cv::Mat> InpaintFrame(ZEDCustomManager* zedCustomManager);
 	void UnloadEngines();
+	~SegPaintManager();
+
 private:
 	SegmentationModel* m_segmentationModel;
 	IPC_connect* m_IPC_connector;
 	static std::vector<DetectedObject> m_detectedObjects;
 	static std::vector<DetectedMask> m_detectedMasks;
 	static std::vector<int> m_removal_ids;
-	cv::Mat m_input360;
-	cv::Mat m_inputCVMat720;
+	cv::Mat m_input360_L;
+	cv::Mat m_inputCVMat720_L;
+	cv::Mat m_input360_R;
+	cv::Mat m_inputCVMat720_R;
 };
 
 #endif

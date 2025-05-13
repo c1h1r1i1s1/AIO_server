@@ -22,7 +22,7 @@ SegmentationModel::~SegmentationModel() {
 }
 
 // Runs segmentation on the input image and populates the detected objects and masks.
-int SegmentationModel::segmentFrame(const cv::Mat& input360,
+int SegmentationModel::segmentFrame(const cv::Mat& input720,
     std::vector<DetectedObject>& detectedObjects,
     std::vector<DetectedMask>& detectedMasks,
     sl::Camera* zedCamera)
@@ -34,7 +34,7 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
     std::vector<DetectedMaskPre> detectedMasksPre;
 
     // Run segmentation with the detector.
-    m_detector->copy_from_Mat(input360);
+    m_detector->copy_from_Mat(input720);
     m_detector->infer();
 
     // Postprocess the outputs to get segmentation objects.
@@ -44,27 +44,26 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
     // Prepare data for the ZED SDK.
     std::vector<sl::CustomMaskObjectData> objects_in;
     objects_in.reserve(objs.size());
+    detectedMasksPre.reserve(objs.size());
 
     for (seg::Object& obj : objs) {
-        DetectedMaskPre tmpMaskPre;
-        sl::CustomMaskObjectData tmp;
-
-        tmpMaskPre.bbox = obj.rect;
+        objects_in.emplace_back();
+        sl::CustomMaskObjectData& tmp{ objects_in.back() };
         tmp.unique_object_id = sl::generate_unique_id();
-        tmpMaskPre.unique_object_id = tmp.unique_object_id;
         tmp.probability = obj.prob;
         tmp.label = obj.label;
         tmp.bounding_box_2d = convertCvRect2SdkBbox(obj.rect);
-
-        tmpMaskPre.mask = obj.boxMask;
-
         tmp.is_grounded = (obj.label == 0);
+        // others are tracked in full 3D space
         cvMat2slMat(obj.boxMask).copyTo(tmp.box_mask, sl::COPY_TYPE::CPU_CPU);
 
-        objects_in.push_back(tmp);
-        detectedMasksPre.push_back(tmpMaskPre);
-
-        // Possible danger here with conversion of bboxes modifying tmMask data
+        detectedMasksPre.emplace_back();
+        DetectedMaskPre& tmpMask{ detectedMasksPre.back() };
+        // cv::Rect_<float> bbox(x0, y0, x1 - x0, y1 - y0);
+        // Need to half this?
+        tmpMask.bbox = obj.rect;
+        tmpMask.unique_object_id = tmp.unique_object_id;
+        tmpMask.mask = obj.boxMask;
     }
 
     sl::Objects objects;
@@ -84,6 +83,9 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
 
         if (tmpObject.label == 0) {
             person_found = true;
+            //std::cout << "About to drop" << std::endl;
+            //std::cout << objects.object_list.at(i).bounding_box[0] << std::endl;
+            //std::cout << objects.object_list.at(i).bounding_box[3] << std::endl;
         }
 
         if (objects.object_list.at(i).bounding_box.size() >= 8) {
