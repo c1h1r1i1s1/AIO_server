@@ -62,7 +62,7 @@ int main(int argc, char** argv)
         }
 
         std::vector<DetectedObject> frameObjects = segPaintManager->GetObjects();
-        std::vector<DetectedMask> frameMasks = segPaintManager->GetMasks();
+        std::vector<DetectedMask> frameMasks; // = segPaintManager->GetMasks();
 
         // Get world pose of camera for correct object positions
         zedCustomManager->GetCurrentPosition(camPose);
