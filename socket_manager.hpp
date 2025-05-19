@@ -16,7 +16,7 @@ class SocketManager {
         ~SocketManager();
         
         bool getPosConfirm();
-        void broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData, sl::Rotation rot, sl::Translation tran);
+        void broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData);
    
         void start();
         void stop();

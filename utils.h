@@ -148,26 +148,22 @@ inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat in
 }
 
 inline void ConvertCameraPose(
-    const seg::float3 corners[8],
-    seg::float3 cornersCam[8],
-    sl::Rotation rot,
-    const sl::Translation tran) {
-    
+    const seg::float3 cornersW[8],
+    seg::float3       cornersC[8],
+    sl::Rotation& Rwc,
+    const sl::Translation& twc)
+{
     for (int i = 0; i < 8; ++i) {
-        float wx = corners[i].x;
-        float wy = corners[i].y;
-        float wz = corners[i].z;
+        float dx = cornersW[i].x - twc.x;
+        float dy = cornersW[i].y - twc.y;
+        float dz = cornersW[i].z - twc.z;
 
-        // 1) Translate so camera is at the origin:
-        float dx = wx - tran[0];
-        float dy = wy - tran[1];
-        float dz = wz - tran[2];
+        cornersC[i].x = Rwc(0, 0) * dx + Rwc(0, 1) * dy + Rwc(0, 2) * dz;
+        cornersC[i].y = Rwc(1, 0) * dx + Rwc(1, 1) * dy + Rwc(1, 2) * dz;
+        cornersC[i].z = Rwc(2, 0) * dx + Rwc(2, 1) * dy + Rwc(2, 2) * dz;
 
-        // 2) Apply the inverse rotation:
-        cornersCam[i].x = rot(0, 0) * dx + rot(1, 0) * dy + rot(2, 0) * dz;
-        cornersCam[i].y = rot(0, 1) * dx + rot(1, 1) * dy + rot(2, 1) * dz;
-        cornersCam[i].z = rot(0, 2) * dx + rot(1, 2) * dy + rot(2, 2) * dz;
     }
+
 }
 
 inline seg::float3 ComputeCenter(seg::float3 corners[8]) {

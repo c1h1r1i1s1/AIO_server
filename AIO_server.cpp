@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     //// Initialise Everything
     std::cout << "Initialising..." << std::endl;
     ZEDCustomManager* zedCustomManager = new ZEDCustomManager();
-    if (zedCustomManager->InitializeZEDCamera()) {
+    if (zedCustomManager->InitializeZEDCamera(true)) {
         return 1;
     }
     std::cout << "\tZedCamera Initialised" << std::endl;
@@ -63,14 +63,6 @@ int main(int argc, char** argv)
 
         std::vector<DetectedObject> frameObjects = segPaintManager->GetObjects();
         std::vector<DetectedMask> frameMasks; // = segPaintManager->GetMasks();
-
-        // Get world pose of camera for correct object positions
-        zedCustomManager->GetCurrentPosition(camPose);
-        sl::Rotation rot = camPose.getRotationMatrix();
-        sl::Translation tran = camPose.getTranslation();
-
-        // Pass to headset in json format
-        socketManager->broadcastBoundingBoxes(frameObjects, rot, tran);
 
         // Remove selected objects
         ObjectChange change;
@@ -111,9 +103,14 @@ int main(int argc, char** argv)
         sl::Mat pcloudGPU;
         pcloud.copyTo(pcloudGPU, sl::COPY_TYPE::CPU_GPU);
 
+        // Get world pose of camera for correct object positions
+        zedCustomManager->GetCurrentPosition(camPose);
+
         viewer.updateData(pcloudGPU, frameMasks, camPose.pose_data);
+
+        socketManager->broadcastBoundingBoxes(frameObjects);
         
-        //cv::imshow("Output", display);
+        cv::imshow("Output", display);
 
         int const cv_key{ cv::waitKey(10) };
         int const gl_key{ viewer.getKey() };

@@ -11,7 +11,7 @@ class ZEDCustomManager {
 		sl::Camera* getCamera();
 		cv::Mat getCurrentMat();
 
-		bool InitializeZEDCamera();
+		bool InitializeZEDCamera(bool isZedStatic);
 		bool CaptureFrame();
 		void GetCurrentPosition(sl::Pose m_camPose);
 		

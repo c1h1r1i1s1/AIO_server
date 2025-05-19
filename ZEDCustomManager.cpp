@@ -23,7 +23,7 @@ cv::Mat ZEDCustomManager::getCurrentMat() {
     return slMat2cvMat(*m_LeftMat);
 }
 
-bool ZEDCustomManager::InitializeZEDCamera() {
+bool ZEDCustomManager::InitializeZEDCamera(bool isZedStatic) {
     // Create the camera instance if not already created.
     if (!m_ZedCamera) {
         std::cout << "Should make new right??" << std::endl;
@@ -44,16 +44,6 @@ bool ZEDCustomManager::InitializeZEDCamera() {
     }
     std::cout << "Camera opened successfully" << std::endl;
 
-    // Enable Positional tracking (mandatory for object detection)
-    //PositionalTrackingParameters positional_tracking_parameters;
-    //If the camera is static, uncomment the following line to have better performances.
-    //positional_tracking_parameters.set_as_static = true;
-    sl::ERROR_CODE zed_error = m_ZedCamera->enablePositionalTracking();
-    if (zed_error != ERROR_CODE::SUCCESS) {
-        m_ZedCamera->close();
-        return EXIT_FAILURE;
-    }
-
     ObjectDetectionParameters detection_parameters;
     detection_parameters.detection_model = OBJECT_DETECTION_MODEL::CUSTOM_BOX_OBJECTS;
     detection_parameters.enable_tracking = true;
@@ -64,7 +54,7 @@ bool ZEDCustomManager::InitializeZEDCamera() {
         m_ZedCamera->enablePositionalTracking(positional_tracking_parameters);
     }
 
-    zed_error = m_ZedCamera->enableObjectDetection(detection_parameters);
+    sl::ERROR_CODE zed_error = m_ZedCamera->enableObjectDetection(detection_parameters);
     if (zed_error != ERROR_CODE::SUCCESS) {
         std::cout << "enableObjectDetection: " << zed_error << "\nExit program.";
         m_ZedCamera->close();
@@ -72,6 +62,9 @@ bool ZEDCustomManager::InitializeZEDCamera() {
     }
 
     m_RuntimeParams = RuntimeParameters();
+    if (!isZedStatic) {
+        m_RuntimeParams.measure3D_reference_frame = sl::REFERENCE_FRAME::WORLD; // Tracks zed movement
+    }
 
     // Retrieve image dimensions.
     sl::Resolution resolution = m_ZedCamera->getCameraInformation().camera_configuration.resolution;

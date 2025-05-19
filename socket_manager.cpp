@@ -109,7 +109,7 @@ void SocketManager::stop() {
     uWS::Loop::get()->free();
 }
 
-void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData, sl::Rotation rot, sl::Translation tran) {
+void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData) {
     
     json boxData;
     boxData["boxes"] = json::array();
@@ -118,11 +118,12 @@ void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingB
         box["id"] = boxInstance.id;
         box["label"] = boxInstance.label;
 
-        seg::float3 cornersCam[8];
-        ConvertCameraPose(boxInstance.bounding_box_3d, cornersCam, rot, tran);
+        if (box["label"] == 59) {
+            continue;
+        }
 
-        seg::float3 center = ComputeCenter(cornersCam);
-        seg::float3 size = ComputeSize(cornersCam);
+        seg::float3 center = ComputeCenter(boxInstance.bounding_box_3d);
+        seg::float3 size = ComputeSize(boxInstance.bounding_box_3d);
 
         box["x"] = center.x;
         box["y"] = center.y;
@@ -135,6 +136,7 @@ void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingB
         
         boxData["boxes"].push_back(box);
     };
+    
     const std::string stringBoxData = boxData.dump();
     
     std::set<uWS::WebSocket<false, true, SocketData>*> clientsCopy;
