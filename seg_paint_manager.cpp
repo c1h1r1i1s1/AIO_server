@@ -25,22 +25,17 @@ bool SegPaintManager::InitialiseEngines() {
 
 int SegPaintManager::ProcessFrame(ZEDCustomManager* zedCustomManager) {
 
-    m_inputCVMat720_L = zedCustomManager->getCurrentLeftMat();
-    m_inputCVMat720_R = zedCustomManager->getCurrentRightMat();
+    m_inputCVMat720 = zedCustomManager->getCurrentMat();
         
     // Scale down to 360p
-    cv::cvtColor(m_inputCVMat720_L, m_inputCVMat720_L, cv::COLOR_BGRA2RGB);
-    m_input360_L.create(360, 640, m_inputCVMat720_L.type());
-    cv::resize(m_inputCVMat720_L, m_input360_L, cv::Size(640, 360));
-    
-    cv::cvtColor(m_inputCVMat720_R, m_inputCVMat720_R, cv::COLOR_BGRA2RGB);
-    m_input360_R.create(360, 640, m_inputCVMat720_R.type());
-    cv::resize(m_inputCVMat720_R, m_input360_R, cv::Size(640, 360));
+    cv::cvtColor(m_inputCVMat720, m_inputCVMat720, cv::COLOR_BGRA2RGB);
+    m_input360.create(360, 640, m_inputCVMat720.type());
+    cv::resize(m_inputCVMat720, m_input360, cv::Size(640, 360));
 
     // Segment
     m_detectedObjects.clear();
     m_detectedMasks.clear();
-    int objectCount = m_segmentationModel->segmentFrame(m_inputCVMat720_L, m_detectedObjects, m_detectedMasks, zedCustomManager->getCamera());
+    int objectCount = m_segmentationModel->segmentFrame(m_inputCVMat720, m_detectedObjects, m_detectedMasks, zedCustomManager->getCamera());
 
     return objectCount;
 
@@ -49,6 +44,12 @@ int SegPaintManager::ProcessFrame(ZEDCustomManager* zedCustomManager) {
 std::vector<DetectedObject> SegPaintManager::GetObjects() const { // Could use maxObjects
 
     return m_detectedObjects;
+
+}
+
+std::vector<DetectedMask> SegPaintManager::GetMasks() const {
+
+    return m_detectedMasks;
 
 }
 
@@ -88,58 +89,41 @@ bool SegPaintManager::ClearRemovals() {
 
 }
 
-std::vector<cv::Mat> SegPaintManager::InpaintFrame(ZEDCustomManager* zedCustomManager) {
+cv::Mat SegPaintManager::InpaintFrame(ZEDCustomManager* zedCustomManager) {
 
     if (m_removal_ids.size() == 0) {
-        return { m_inputCVMat720_L, m_inputCVMat720_R };
+        return m_inputCVMat720;
     }
 
     // 2. Convert the image to float and normalize pixel values to [-1, 1]
-    cv::Mat imageFloat_L;
-    cv::Mat imageFloat_R;
-    m_inputCVMat720_L.convertTo(imageFloat_L, CV_32FC3, 1.0 / 127.5, -1.0);  // (img/127.5) - 1
-    m_inputCVMat720_R.convertTo(imageFloat_R, CV_32FC3, 1.0 / 127.5, -1.0);
+    cv::Mat imageFloat;
+    m_inputCVMat720.convertTo(imageFloat, CV_32FC3, 1.0 / 127.5, -1.0);  // (img/127.5) - 1
 
     // Combine selected masks (720p)
-    cv::Mat combinedMask_L = combineMasks(m_removal_ids, m_inputCVMat720_L, m_detectedMasks);
-    cv::Mat combinedMask_R = warpAndCombineMasksToRight(zedCustomManager->getCamera(),
-        m_inputCVMat720_R,
-        m_removal_ids,
-        m_detectedMasks);
-    //cv::Mat combinedMask_R = warpMaskToRight(zedCustomManager->getCamera(), combinedMask_L);
+    cv::Mat combinedMask = combineMasks(m_removal_ids, m_inputCVMat720, m_detectedMasks);
 
-    imageFloat_L = prepareMaskedImage(imageFloat_L, combinedMask_L); // Combine mask and input
-    imageFloat_R = prepareMaskedImage(imageFloat_R, combinedMask_R);
+    imageFloat = prepareMaskedImage(imageFloat, combinedMask); // Combine mask and input
 
     // 5. Convert the masked image to a blob with shape (1, 3, 360, 640)
     // blobFromImage converts from HWC (360x640x3) to CHW and adds a batch dimension.
-    cv::Mat imageBlobFP32_L = cv::dnn::blobFromImage(imageFloat_L);
-    cv::Mat imageBlobFP32_R = cv::dnn::blobFromImage(imageFloat_R);
+    cv::Mat imageBlobFP32 = cv::dnn::blobFromImage(imageFloat);
 
-    cv::Mat rawPaintData_L;
-    cv::Mat rawPaintData_R;
-    if (m_IPC_connector->inpaintBlob(imageBlobFP32_L, imageBlobFP32_R, rawPaintData_L, rawPaintData_R)) {
-        return { m_inputCVMat720_L, m_inputCVMat720_R };
+    cv::Mat rawPaintData;
+    if (m_IPC_connector->inpaintBlob(imageBlobFP32, rawPaintData)) {
+        return m_inputCVMat720;
     }
         
     // Process output
-    cv::Mat predictedImage360_L;
-    cv::Mat predictedImage360_R;
-    int res = extractOutputs(rawPaintData_L, predictedImage360_L);
+    cv::Mat predictedImage360;
+    int res = extractOutputs(rawPaintData, predictedImage360);
     if (res) {
         LogStatement("Issue with extracting outputs into HCW format");
-        return { m_inputCVMat720_L, m_inputCVMat720_R };
-    }
-    res = extractOutputs(rawPaintData_R, predictedImage360_R);
-    if (res) {
-        LogStatement("Issue with extracting outputs into HCW format");
-        return { m_inputCVMat720_L, m_inputCVMat720_R };
+        return m_inputCVMat720;
     }
 
-    cv::Mat composite_L = compositeOutput(predictedImage360_L, combinedMask_L, m_inputCVMat720_L);
-    cv::Mat composite_R = compositeOutput(predictedImage360_R, combinedMask_R, m_inputCVMat720_R);
+    cv::Mat composite = compositeOutput(predictedImage360, combinedMask, m_inputCVMat720);
 
-    return { composite_L, composite_R };
+    return composite;
 
 }
 

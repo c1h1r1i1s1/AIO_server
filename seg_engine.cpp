@@ -59,8 +59,6 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
 
         detectedMasksPre.emplace_back();
         DetectedMaskPre& tmpMask{ detectedMasksPre.back() };
-        // cv::Rect_<float> bbox(x0, y0, x1 - x0, y1 - y0);
-        // Need to half this?
         tmpMask.bbox = obj.rect;
         tmpMask.unique_object_id = tmp.unique_object_id;
         tmpMask.mask = obj.boxMask;
@@ -71,8 +69,6 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
     zedCamera->ingestCustomMaskObjects(objects_in);
     zedCamera->retrieveObjects(objects, cod_rt_param);
 
-    bool person_found = false;
-
     for (size_t i = 0; i < objects.object_list.size(); i++) {
         DetectedObject tmpObject;
         DetectedMask tmpMask;
@@ -80,13 +76,6 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
         tmpObject.id = objects.object_list.at(i).id;
         tmpObject.probability = objects.object_list.at(i).confidence;
         tmpObject.label = objects.object_list.at(i).raw_label;
-
-        if (tmpObject.label == 0) {
-            person_found = true;
-            //std::cout << "About to drop" << std::endl;
-            //std::cout << objects.object_list.at(i).bounding_box[0] << std::endl;
-            //std::cout << objects.object_list.at(i).bounding_box[3] << std::endl;
-        }
 
         if (objects.object_list.at(i).bounding_box.size() >= 8) {
             memcpy(tmpObject.bounding_box_3d,
@@ -104,6 +93,10 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
         for (DetectedMaskPre preMask : detectedMasksPre) {
             if (objects.object_list.at(i).unique_object_id == preMask.unique_object_id) {
                 tmpMask.id = objects.object_list.at(i).id;
+                tmpMask.position = objects.object_list.at(i).position;
+                tmpMask.tracking_state = objects.object_list.at(i).tracking_state;
+                tmpMask.raw_label = objects.object_list.at(i).raw_label;
+                tmpMask.zed_bb = objects.object_list.at(i).bounding_box;
                 tmpMask.mask = preMask.mask;
                 tmpMask.bbox = preMask.bbox;
                 detectedMasks.push_back(tmpMask);

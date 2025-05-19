@@ -9,8 +9,7 @@ class ZEDCustomManager {
 	public:
 		explicit ZEDCustomManager();
 		sl::Camera* getCamera();
-		cv::Mat getCurrentLeftMat();
-		cv::Mat getCurrentRightMat();
+		cv::Mat getCurrentMat();
 
 		bool InitializeZEDCamera();
 		bool CaptureFrame();
@@ -24,7 +23,6 @@ class ZEDCustomManager {
 		static sl::InitParameters m_InitParams;
 		static sl::RuntimeParameters m_RuntimeParams;
 		static sl::Mat* m_LeftMat;
-		static sl::Mat* m_RightMat;
 
 		static int m_ImageWidth;
 		static int m_ImageHeight;

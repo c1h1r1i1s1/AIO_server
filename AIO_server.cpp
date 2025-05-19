@@ -5,14 +5,17 @@ float rotationVector[3];
 float translationVector[3];
 std::vector<int> removal_ids;
 sl::Pose camPose;
+sl::Mat pcloud;
 
 std::atomic<bool> g_shouldExit{ false };
+
+int key{ 0 };
 
 void onSignal(int signum) {
     g_shouldExit = true;
 }
 
-int main()
+int main(int argc, char** argv)
 {
     // Set up close handling
     std::signal(SIGINT, onSignal);
@@ -38,6 +41,14 @@ int main()
     socketManager->start();
     std::cout << "\tHeadset Socket Initialised" << std::endl;
 
+    // 3D Viewer
+    GLViewer viewer;
+    sl::CameraConfiguration const camera_config{ zedCustomManager->getCamera()->getCameraInformation().camera_configuration};
+    sl::Resolution const pc_resolution{ std::min(camera_config.resolution.width, static_cast<size_t>(1280UL)),
+                                       std::min(camera_config.resolution.height, static_cast<size_t>(720UL)) };
+    sl::CameraConfiguration const camera_info{ zedCustomManager->getCamera()->getCameraInformation(pc_resolution).camera_configuration };
+    viewer.init(argc, argv, camera_info.calibration_parameters.left_cam, true);
+
     //// Begin detection
     std::cout << "Main loop beginning" << std::endl;
     while (!g_shouldExit) {
@@ -51,6 +62,7 @@ int main()
         }
 
         std::vector<DetectedObject> frameObjects = segPaintManager->GetObjects();
+        std::vector<DetectedMask> frameMasks = segPaintManager->GetMasks();
 
         // Get world pose of camera for correct object positions
         zedCustomManager->GetCurrentPosition(camPose);
@@ -71,25 +83,60 @@ int main()
             }
         }
 
-        cv::Mat paintedFrame_L, paintedFrame_R;
-        std::vector<cv::Mat> paintedFrames = segPaintManager->InpaintFrame(zedCustomManager);
-        if (paintedFrames.size() < 2) {
-            std::cout << "not enough painted frames produced" << std::endl;
-            return 1;
+        cv::Mat paintedFrame = segPaintManager->InpaintFrame(zedCustomManager);
+        cv::Mat display;
+        cv::cvtColor(paintedFrame, display, cv::COLOR_BGRA2RGBA);
+
+        /// Point cloud
+        zedCustomManager->getCamera()->retrieveMeasure(pcloud, sl::MEASURE::XYZRGBA, sl::MEM::CPU, pc_resolution);
+
+        int W = pcloud.getWidth(), H = pcloud.getHeight();
+        auto ptr = pcloud.getPtr<sl::float4>(sl::MEM::CPU);
+
+        for (int y = 0; y < H; ++y) {
+            for (int x = 0; x < W; ++x) {
+                int idx = y * W + x;
+
+                cv::Vec4b px = display.at<cv::Vec4b>(y, x);
+                // pack into 0xBBGGRRAA on little-endian
+                uint32_t packed =
+                    (uint32_t(px[2]) << 0)   // B
+                    | (uint32_t(px[1]) << 8)   // G
+                    | (uint32_t(px[0]) << 16)   // R
+                    | (uint32_t(px[3]) << 24);  // A
+                ptr[idx].w = *reinterpret_cast<float*>(&packed);
+            }
         }
-        paintedFrame_L = paintedFrames[0];
-        paintedFrame_R = paintedFrames[1];
-        cv::Mat display_L;
-        cv::Mat display_R;
-        cv::cvtColor(paintedFrame_L, display_L, cv::COLOR_BGRA2RGB);
-        cv::cvtColor(paintedFrame_R, display_R, cv::COLOR_BGRA2RGB);
-        cv::imshow("Output_L", display_L);
-        cv::imshow("Output_R", display_R);
-        if (cv::waitKey(1) == 27)  // exit on ESC
+
+        sl::Mat pcloudGPU;
+        pcloud.copyTo(pcloudGPU, sl::COPY_TYPE::CPU_GPU);
+
+        viewer.updateData(pcloudGPU, frameMasks, camPose.pose_data);
+        
+        //cv::imshow("Output", display);
+
+        int const cv_key{ cv::waitKey(10) };
+        int const gl_key{ viewer.getKey() };
+        key = (gl_key == -1) ? cv_key : gl_key;
+        if (key == 'p' || key == 32) {
+            viewer.setPlaying(!viewer.isPlaying());
+        }
+        while ((key == -1) && !viewer.isPlaying() && viewer.isAvailable()) {
+            int const cv_key{ cv::waitKey(10) };
+            int const gl_key{ viewer.getKey() };
+            key = (gl_key == -1) ? cv_key : gl_key;
+            if (key == 'p' || key == 32) {
+                viewer.setPlaying(!viewer.isPlaying());
+            }
+        }
+        if (!viewer.isAvailable())
             break;
     }
 
     std::cout << "Program exiting..." << std::endl;
+
+    cv::destroyAllWindows();
+    viewer.exit();
     
     delete segPaintManager;
     delete socketManager;

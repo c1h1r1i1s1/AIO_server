@@ -3,3 +3,4 @@
 #include "ChangeQueue.hpp"
 #include <csignal>
 #include <atomic>
+#include "GLViewer.hpp"

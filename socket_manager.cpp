@@ -101,9 +101,6 @@ void SocketManager::stop() {
         m_listenSocket = nullptr;
     }
 
-    //// Signal the uWS event loop to stop, which causes run() to return.
-    //uWS::Loop::get()->stop();
-
     // If needed, join the listener thread in the destructor or here.
     if (m_listenerThread.joinable()) {
         m_listenerThread.join();
@@ -123,13 +120,6 @@ void SocketManager::broadcastBoundingBoxes(std::vector<DetectedObject> boundingB
 
         seg::float3 cornersCam[8];
         ConvertCameraPose(boxInstance.bounding_box_3d, cornersCam, rot, tran);
-
-        //if (boxInstance.id == 0) {
-        //    LogStatement("About to drop some facts");
-        //    for (int i = 0; i < 8; ++i) {
-        //        LogStatement(std::to_string(cornersCam[i].z));
-        //    }
-        //}
 
         seg::float3 center = ComputeCenter(cornersCam);
         seg::float3 size = ComputeSize(cornersCam);

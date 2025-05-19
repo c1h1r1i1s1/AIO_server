@@ -9,7 +9,6 @@ sl::Camera* ZEDCustomManager::m_ZedCamera = new sl::Camera();;
 sl::InitParameters ZEDCustomManager::m_InitParams = sl::InitParameters();
 sl::RuntimeParameters ZEDCustomManager::m_RuntimeParams = sl::RuntimeParameters();
 sl::Mat* ZEDCustomManager::m_LeftMat = nullptr;
-sl::Mat* ZEDCustomManager::m_RightMat = nullptr;
 
 int ZEDCustomManager::m_ImageWidth = 0;
 int ZEDCustomManager::m_ImageHeight = 0;
@@ -20,12 +19,8 @@ sl::Camera* ZEDCustomManager::getCamera() {
     return m_ZedCamera;
 }
 
-cv::Mat ZEDCustomManager::getCurrentLeftMat() {
+cv::Mat ZEDCustomManager::getCurrentMat() {
     return slMat2cvMat(*m_LeftMat);
-}
-
-cv::Mat ZEDCustomManager::getCurrentRightMat() {
-    return slMat2cvMat(*m_RightMat);
 }
 
 bool ZEDCustomManager::InitializeZEDCamera() {
@@ -38,6 +33,7 @@ bool ZEDCustomManager::InitializeZEDCamera() {
     // Set initialization parameters.
     m_InitParams.camera_resolution = RESOLUTION::HD720;
     m_InitParams.depth_mode = DEPTH_MODE::NEURAL;
+    m_InitParams.coordinate_system = sl::COORDINATE_SYSTEM::RIGHT_HANDED_Y_UP;
     m_InitParams.sdk_verbose = 1;
 
     // Open the camera.
@@ -86,9 +82,6 @@ bool ZEDCustomManager::InitializeZEDCamera() {
     if (!m_LeftMat) {
         m_LeftMat = new sl::Mat(m_ImageWidth, m_ImageHeight, MAT_TYPE::U8_C4, MEM::CPU);
     }
-    if (!m_RightMat) {
-        m_RightMat = new sl::Mat(m_ImageWidth, m_ImageHeight, MAT_TYPE::U8_C4, MEM::CPU);
-    }
 
     return 0;
 }
@@ -109,11 +102,6 @@ bool ZEDCustomManager::CaptureFrame() {
         std::cerr << "Failed to retrieve image from camera L" << std::endl;
         return 1;
     }
-    state = m_ZedCamera->retrieveImage(*m_RightMat, VIEW::RIGHT);
-    if (state != ERROR_CODE::SUCCESS) {
-        std::cerr << "Failed to retrieve image from camera R" << std::endl;
-        return 1;
-    }
     return 0;
 }
 
@@ -128,10 +116,6 @@ void ZEDCustomManager::CloseZEDCamera() {
     if (m_LeftMat) {
         delete m_LeftMat;
         m_LeftMat = nullptr;
-    }
-    if (m_RightMat) {
-        delete m_RightMat;
-        m_RightMat = nullptr;
     }
 }
 

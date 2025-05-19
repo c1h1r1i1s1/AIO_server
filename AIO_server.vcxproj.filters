@@ -42,6 +42,9 @@
     <ClCompile Include="ChangeQueue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GLViewer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AIO_server.hpp">
@@ -75,6 +78,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ChangeQueue.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GLViewer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GL_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
