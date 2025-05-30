@@ -186,10 +186,10 @@ namespace seg {
         cv::Mat mask;       // Expected to be CV_32F (binary, with 0.0 and 1.0 values)
         int id;
         cv::Rect bbox;
-    };
-
-    struct SocketData {
-        
+        sl::float3 position;
+        sl::OBJECT_TRACKING_STATE tracking_state;
+        int raw_label;
+        std::vector<sl::float3> zed_bb;
     };
 }
 

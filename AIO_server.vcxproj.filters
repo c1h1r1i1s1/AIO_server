@@ -39,7 +39,10 @@
     <ClCompile Include="ZEDCustomManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="aruco_detection.cpp">
+    <ClCompile Include="ChangeQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GLViewer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -74,8 +77,19 @@
     <ClInclude Include="socket_manager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="aruco_detection.hpp">
+    <ClInclude Include="ChangeQueue.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GLViewer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GL_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="yolov11m-seg.engine">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

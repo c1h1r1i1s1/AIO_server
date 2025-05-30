@@ -13,12 +13,14 @@ public:
 	bool InitialiseEngines();
 	int ProcessFrame(ZEDCustomManager* zedCustomManager);
 	std::vector<DetectedObject> GetObjects() const;
-	void getSegFrame();
+	std::vector<DetectedMask> GetMasks() const;
 	bool ErasePrivateObject(int id);
 	bool ShowPrivateObject(int id);
 	bool ClearRemovals();
-	cv::Mat InpaintFrame();
+	cv::Mat InpaintFrame(ZEDCustomManager* zedCustomManager);
 	void UnloadEngines();
+	~SegPaintManager();
+
 private:
 	SegmentationModel* m_segmentationModel;
 	IPC_connect* m_IPC_connector;

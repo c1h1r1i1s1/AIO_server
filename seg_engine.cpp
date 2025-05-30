@@ -1,19 +1,16 @@
+// This manages the YOLO model and provides a set of functions for accessing the model I/O
 #include "seg_engine.hpp"
 #include "ZEDCustomManager.hpp"
 #include <cstring>
 #include <sstream>
 #include <filesystem>
 
-// Constructor: create the detector instance and perform initial setup.
 SegmentationModel::SegmentationModel(const std::string& engineFilePath)
 {
-    // Create the detector and load the engine.
     m_detector = new YOLOv11_seg(engineFilePath);
-    // The make_pipe call allocates buffers; 'false' means no warmup.
     m_detector->make_pipe();
 }
 
-// Destructor: release the detector.
 SegmentationModel::~SegmentationModel() {
     if (m_detector) {
         delete m_detector;
@@ -22,7 +19,7 @@ SegmentationModel::~SegmentationModel() {
 }
 
 // Runs segmentation on the input image and populates the detected objects and masks.
-int SegmentationModel::segmentFrame(const cv::Mat& input360,
+int SegmentationModel::segmentFrame(const cv::Mat& input720,
     std::vector<DetectedObject>& detectedObjects,
     std::vector<DetectedMask>& detectedMasks,
     sl::Camera* zedCamera)
@@ -34,7 +31,7 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
     std::vector<DetectedMaskPre> detectedMasksPre;
 
     // Run segmentation with the detector.
-    m_detector->copy_from_Mat(input360);
+    m_detector->copy_from_Mat(input720);
     m_detector->infer();
 
     // Postprocess the outputs to get segmentation objects.
@@ -44,39 +41,38 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
     // Prepare data for the ZED SDK.
     std::vector<sl::CustomMaskObjectData> objects_in;
     objects_in.reserve(objs.size());
+    detectedMasksPre.reserve(objs.size());
 
     for (seg::Object& obj : objs) {
-        DetectedMaskPre tmpMaskPre;
-        sl::CustomMaskObjectData tmp;
-
-        tmpMaskPre.bbox = obj.rect;
+        objects_in.emplace_back();
+        sl::CustomMaskObjectData& tmp{ objects_in.back() };
         tmp.unique_object_id = sl::generate_unique_id();
-        tmpMaskPre.unique_object_id = tmp.unique_object_id;
         tmp.probability = obj.prob;
         tmp.label = obj.label;
+
+        // Currently set to ignore people, tables, phones and controllers
+        if (tmp.label == 0 || tmp.label == 60 || tmp.label == 65 || tmp.label == 67) {
+            continue;
+        }
+
         tmp.bounding_box_2d = convertCvRect2SdkBbox(obj.rect);
-
-        tmpMaskPre.mask = obj.boxMask;
-
-        //if (obj.label == 0) {
-            //cv::imshow("raw mask", obj.boxMask);
-        //}
-
+        // Ground object if its a person
         tmp.is_grounded = (obj.label == 0);
+        // others are tracked in full 3D space
+
         cvMat2slMat(obj.boxMask).copyTo(tmp.box_mask, sl::COPY_TYPE::CPU_CPU);
 
-        objects_in.push_back(tmp);
-        detectedMasksPre.push_back(tmpMaskPre);
-
-        // Possible danger here with conversion of bboxes modifying tmMask data
+        detectedMasksPre.emplace_back();
+        DetectedMaskPre& tmpMask{ detectedMasksPre.back() };
+        tmpMask.bbox = obj.rect;
+        tmpMask.unique_object_id = tmp.unique_object_id;
+        tmpMask.mask = obj.boxMask;
     }
 
     sl::Objects objects;
     sl::CustomObjectDetectionRuntimeParameters cod_rt_param;
     zedCamera->ingestCustomMaskObjects(objects_in);
     zedCamera->retrieveObjects(objects, cod_rt_param);
-
-    bool person_found = false;
 
     for (size_t i = 0; i < objects.object_list.size(); i++) {
         DetectedObject tmpObject;
@@ -86,18 +82,16 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
         tmpObject.probability = objects.object_list.at(i).confidence;
         tmpObject.label = objects.object_list.at(i).raw_label;
 
-        if (tmpObject.label == 0) {
-            person_found = true;
-        }
-
+        // If bounding boxes are broken or empty, skip
         if (objects.object_list.at(i).bounding_box.size() >= 8) {
             memcpy(tmpObject.bounding_box_3d,
                 objects.object_list.at(i).bounding_box.data(),
                 8 * sizeof(sl::float3));
         }
         else {
-            std::cout << "Issue creating 3d bb data array" << std::endl;
-            return -1;
+            LogStatement("Skipping id=" + std::to_string(objects.object_list[i].id) +
+                " (got " + std::to_string(objects.object_list.at(i).bounding_box.size()) + " corners)\n");
+            continue;
         }
 
         detectedObjects.push_back(tmpObject);
@@ -105,6 +99,10 @@ int SegmentationModel::segmentFrame(const cv::Mat& input360,
         for (DetectedMaskPre preMask : detectedMasksPre) {
             if (objects.object_list.at(i).unique_object_id == preMask.unique_object_id) {
                 tmpMask.id = objects.object_list.at(i).id;
+                tmpMask.position = objects.object_list.at(i).position;
+                tmpMask.tracking_state = objects.object_list.at(i).tracking_state;
+                tmpMask.raw_label = objects.object_list.at(i).raw_label;
+                tmpMask.zed_bb = objects.object_list.at(i).bounding_box;
                 tmpMask.mask = preMask.mask;
                 tmpMask.bbox = preMask.bbox;
                 detectedMasks.push_back(tmpMask);

@@ -12,7 +12,7 @@ class IPC_connect {
 
         ~IPC_connect();
 
-        bool inpaintBlob(const cv::Mat& inputBlob, cv::Mat& outputBlob);
+        bool inpaintBlob(const cv::Mat& inputBlob_L, cv::Mat& outputBlob_L);
 
     private:
         HANDLE hMapFile = NULL;

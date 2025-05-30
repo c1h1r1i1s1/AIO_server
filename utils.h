@@ -73,42 +73,37 @@ inline float fp16ToFloat(uint16_t h) {
     return __half2float(h_val);
 }
 
-inline cv::Mat compositeOutput(const cv::Mat& predictedImage360, cv::Mat& mask360, cv::Mat& inputCVMat720)
+inline cv::Mat compositeOutput(const cv::Mat& predictedImage360, cv::Mat& mask720, cv::Mat& inputCVMat720)
 {
 
     // Upscale from 360p to 720p
-    // 720p resolution is 1280x720.
     cv::Mat predictedImage720;
     cv::resize(predictedImage360, predictedImage720, cv::Size(1280, 720), 0, 0, cv::INTER_LINEAR);
-    cv::cvtColor(predictedImage720, predictedImage720, cv::COLOR_RGB2BGR);
 
-    // --- Process and Upscale the Mask ---
-    if (mask360.channels() == 3)
-        cv::cvtColor(mask360, mask360, cv::COLOR_BGR2GRAY);
+    // Process and Upscale the Mask
+    if (mask720.channels() == 3)
+        cv::cvtColor(mask720, mask720, cv::COLOR_BGR2GRAY);
 
     // Convert to CV_8U, scaling from [0,1] to [0,255].
-    mask360.convertTo(mask360, CV_8U, 255.0);
-
-    // Upscale the mask to 720p using nearest neighbor to preserve binary values.
-    cv::Mat mask720;
-    cv::resize(mask360, mask720, cv::Size(1280, 720), 0, 0, cv::INTER_NEAREST);
+    mask720.convertTo(mask720, CV_8U, 255.0);
 
     cv::Mat invMask = cv::Mat::ones(mask720.size(), mask720.type()) * 255 - mask720;
 
-    // --- Composite the Inpainted Region onto the Original 720p Image ---
+    // Composite the Inpainted Region onto the Original 720p Image
     cv::Mat compositedImage = inputCVMat720.clone();
+
     // The non-zero values in mask720 indicate where to copy the predicted image.
     predictedImage720.copyTo(compositedImage, invMask);
 
     return compositedImage;
 }
 
-inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat input360, const std::vector<DetectedMask> detectedMasks) {
+inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat input720, const std::vector<DetectedMask> detectedMasks) {
 
     // Create an unordered_set for quick lookup of removal IDs.
     std::unordered_set<int> removalSet(removal_ids.begin(), removal_ids.end());
 
-    cv::Mat compositeMask(input360.size(), CV_32F, cv::Scalar(1.0));
+    cv::Mat compositeMask(input720.size(), CV_32F, cv::Scalar(1.0));
 
     // Iterate over each detected mask.
     for (const auto& dm : detectedMasks) {
@@ -125,10 +120,6 @@ inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat in
             cv::Mat binaryMask32;
             binaryMask.convertTo(binaryMask32, CV_32F);
 
-            // Convert single-channel mask to 3 channels to match the frame
-            /*cv::Mat mask3Ch;
-            cv::cvtColor(binaryMask32, mask3Ch, cv::COLOR_GRAY2RGB);*/
-
             // Get specific boxed section of composite mask and remove mask
             cv::Mat roi = compositeMask(bbox);
             cv::Mat result = roi.mul(1.0 - binaryMask32);
@@ -139,7 +130,7 @@ inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat in
     cv::Mat binaryMask;
     compositeMask.convertTo(binaryMask, CV_8U, -255.0, 255.0);
 
-    int kernelSize = 4; // A 3x3 kernel; increase size for a larger buffer.
+    int kernelSize = 5; // A 3x3 kernel; increase size for a larger buffer.
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(kernelSize, kernelSize));
 
     // Perform dilation on the full-frame mask.
@@ -155,16 +146,84 @@ inline cv::Mat combineMasks(const std::vector<int> removal_ids, const cv::Mat in
     return final3ChMask;
 }
 
+inline void ConvertCameraPose(
+    const seg::float3 cornersW[8],
+    seg::float3       cornersC[8],
+    sl::Rotation& Rwc,
+    const sl::Translation& twc)
+{
+    for (int i = 0; i < 8; ++i) {
+        float dx = cornersW[i].x - twc.x;
+        float dy = cornersW[i].y - twc.y;
+        float dz = cornersW[i].z - twc.z;
+
+        cornersC[i].x = Rwc(0, 0) * dx + Rwc(0, 1) * dy + Rwc(0, 2) * dz;
+        cornersC[i].y = Rwc(1, 0) * dx + Rwc(1, 1) * dy + Rwc(1, 2) * dz;
+        cornersC[i].z = Rwc(2, 0) * dx + Rwc(2, 1) * dy + Rwc(2, 2) * dz;
+
+    }
+
+}
+
+inline seg::float3 ComputeCenter(seg::float3 corners[8]) {
+    seg::float3 min = corners[0];
+    seg::float3 max = corners[0];
+
+    for (int i = 1; i < 8; ++i) {
+        if (corners[i].x < min.x) min.x = corners[i].x;
+        if (corners[i].y < min.y) min.y = corners[i].y;
+        if (corners[i].z < min.z) min.z = corners[i].z;
+
+        if (corners[i].x > max.x) max.x = corners[i].x;
+        if (corners[i].y > max.y) max.y = corners[i].y;
+        if (corners[i].z > max.z) max.z = corners[i].z;
+    }
+
+    seg::float3 center;
+    center.x = (min.x + max.x) / 2000.0f;
+    center.y = (min.y + max.y) / 2000.0f;
+    center.z = (min.z + max.z) / 2000.0f;
+
+    return center;
+}
+
+inline seg::float3 ComputeSize(seg::float3 corners[8]) {
+    seg::float3 min = corners[0];
+    seg::float3 max = corners[0];
+
+    for (int i = 1; i < 8; ++i) {
+        if (corners[i].x < min.x) min.x = corners[i].x;
+        if (corners[i].y < min.y) min.y = corners[i].y;
+        if (corners[i].z < min.z) min.z = corners[i].z;
+
+        if (corners[i].x > max.x) max.x = corners[i].x;
+        if (corners[i].y > max.y) max.y = corners[i].y;
+        if (corners[i].z > max.z) max.z = corners[i].z;
+    }
+
+    seg::float3 size;
+    size.x = (max.x - min.x) / 1000.0f; // width
+    size.y = (max.y - min.y) / 1000.0f; // height
+    size.z = (max.z - min.z) / 1000.0f; // depth
+
+    return size;
+}
+
 // This function assumes:
-// - RGB360 is a 360x640 RGB image from the ZED camera (after conversion) CV_32FC3
+// - RGB360 is a 720p RGB image from the ZED camera (after conversion) CV_32FC3
 // - boxMask is a CV_32FC3 binary (grayscale) mask from YOLO segmentation where the mask regions are non-zero
-inline cv::Mat prepareMaskedImage(const cv::Mat& RGB360, const cv::Mat& combinedMask) {
+inline cv::Mat prepareMaskedImage(const cv::Mat& RGB720, const cv::Mat& combinedMask) {
 
     // Multiply the input image by the inverse mask
     // This will zero out the regions where the mask is 1.
-    cv::Mat maskedImage = RGB360.mul(combinedMask);
+    cv::Mat maskedImage = RGB720.mul(combinedMask);
 
-    return maskedImage;
+    // Rescale to 360 for inpainting
+    cv::Mat RGB360;
+    RGB360.create(360, 640, RGB720.type());
+    cv::resize(maskedImage, RGB360, cv::Size(640, 360));
+
+    return RGB360;
 }
 
 // Rearranging, scaling, and converting to an 8-bit image.

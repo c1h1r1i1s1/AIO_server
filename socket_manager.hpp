@@ -3,17 +3,20 @@
 
 #include <uwebsockets/App.h>
 #include "common.hpp"
+#include "utils.h"
 #include <iostream>
 
-using namespace seg;
+#include "ChangeQueue.hpp"
+
+struct SocketData {};
 
 class SocketManager {
     public:
-        SocketManager();
+        SocketManager(ChangeQueue* g_changeQueue);
         ~SocketManager();
-
-        void broadcastBoundingBoxes(const std::string& boundingBoxData);
-        std::vector<int> getRemovalIds();
+        
+        bool getPosConfirm();
+        void broadcastBoundingBoxes(std::vector<DetectedObject> boundingBoxData);
    
         void start();
         void stop();
@@ -21,8 +24,13 @@ private:
 
     static std::set<uWS::WebSocket<false, true, SocketData>*> m_clients;
     static std::mutex m_clientsMutex;
+    static ChangeQueue* gc_changeQueue;
+    static bool posConfirm;
+    static std::mutex posConfirmMutex;
 
-    static std::vector<int, int> m_selection_changes;
+    std::thread m_listenerThread;
+    us_listen_socket_t* m_listenSocket = nullptr;
+    bool m_running;
 };
 
 #endif

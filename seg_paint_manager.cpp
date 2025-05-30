@@ -1,12 +1,19 @@
+// This program manages the segmentation engine and the inpainting IPC connections at a high level
+// It manages the set of IDs to be removed each frame
+// It essentially controls the Diminished Reality component of this application
 #include "seg_paint_manager.hpp"
 #include "ZEDCustomManager.hpp"
+
+std::vector<DetectedObject> SegPaintManager::m_detectedObjects;
+std::vector<DetectedMask> SegPaintManager::m_detectedMasks;
+std::vector<int> SegPaintManager::m_removal_ids;
 
 bool SegPaintManager::InitialiseEngines() {
         
     try {
 
         m_IPC_connector = new IPC_connect();
-        m_segmentationModel = new SegmentationModel("Assets/StreamingAssets/yolov11m-seg.engine");
+        m_segmentationModel = new SegmentationModel("yolov11m-seg.engine");
 
     } catch (const std::exception& e) {
         LogStatement("Loading engines failed");
@@ -31,21 +38,22 @@ int SegPaintManager::ProcessFrame(ZEDCustomManager* zedCustomManager) {
     // Segment
     m_detectedObjects.clear();
     m_detectedMasks.clear();
-    int objectCount = m_segmentationModel->segmentFrame(m_input360, m_detectedObjects, m_detectedMasks, zedCustomManager->getCamera());
+    int objectCount = m_segmentationModel->segmentFrame(m_inputCVMat720, m_detectedObjects, m_detectedMasks, zedCustomManager->getCamera());
 
     return objectCount;
 
 }
 
-std::vector<DetectedObject> SegPaintManager::GetObjects() const { // Could use maxObjects
+std::vector<DetectedObject> SegPaintManager::GetObjects() const {
 
     return m_detectedObjects;
 
 }
 
-void SegPaintManager::getSegFrame() {
-    // Combine selected masks
-    cv::Mat combinedMask = combineMasks(m_removal_ids, m_input360, m_detectedMasks);
+std::vector<DetectedMask> SegPaintManager::GetMasks() const {
+
+    return m_detectedMasks;
+
 }
 
 bool SegPaintManager::ErasePrivateObject(int id) {
@@ -84,48 +92,52 @@ bool SegPaintManager::ClearRemovals() {
 
 }
 
-cv::Mat SegPaintManager::InpaintFrame() {
+cv::Mat SegPaintManager::InpaintFrame(ZEDCustomManager* zedCustomManager) {
 
-        // 1. Convert input image from BGR to RGB for inpainting model
-        cv::Mat imageRGB;
-        cv::cvtColor(m_input360, imageRGB, cv::COLOR_BGR2RGB);
-
-        // 2. Convert the image to float and normalize pixel values to [-1, 1]
-        cv::Mat imageFloat;
-        imageRGB.convertTo(imageFloat, CV_32FC3, 1.0 / 127.5, -1.0);  // (img/127.5) - 1
-
-        // Combine selected masks
-        cv::Mat combinedMask = combineMasks(m_removal_ids, m_input360, m_detectedMasks);
-
-        imageFloat = prepareMaskedImage(imageFloat, combinedMask);
-
-        // 5. Convert the masked image to a blob with shape (1, 3, 360, 640)
-        // blobFromImage converts from HWC (360x640x3) to CHW and adds a batch dimension.
-        cv::Mat imageBlobFP32 = cv::dnn::blobFromImage(imageFloat);
-
-        cv::Mat rawPaintData;
-        if (m_IPC_connector->inpaintBlob(imageBlobFP32, rawPaintData)) {
-            return imageRGB;
-        }
-        
-        // Process output
-
-        cv::Mat predictedImage360;
-        int res = extractOutputs(rawPaintData, predictedImage360);
-        if (res) {
-            LogStatement("Issue with extracting outputs into HCW format");
-            return imageRGB;
-        }
-
-        cv::Mat composite = compositeOutput(predictedImage360, combinedMask, m_inputCVMat720);
-
-        return composite;
-
+    if (m_removal_ids.size() == 0) {
+        return m_inputCVMat720;
     }
+
+    // Convert the image to float and normalize pixel values to [-1, 1]
+    cv::Mat imageFloat;
+    m_inputCVMat720.convertTo(imageFloat, CV_32FC3, 1.0 / 127.5, -1.0);
+
+    // Combine selected masks (720p)
+    cv::Mat combinedMask = combineMasks(m_removal_ids, m_inputCVMat720, m_detectedMasks);
+
+    imageFloat = prepareMaskedImage(imageFloat, combinedMask); // Combine mask and input
+
+    // Convert the masked image to a blob with shape (1, 3, 360, 640)
+    // blobFromImage converts from HWC (360x640x3) to CHW and adds a batch dimension.
+    cv::Mat imageBlobFP32 = cv::dnn::blobFromImage(imageFloat);
+
+    // Send over IPC to inpaint manager
+    cv::Mat rawPaintData;
+    if (m_IPC_connector->inpaintBlob(imageBlobFP32, rawPaintData)) {
+        return m_inputCVMat720;
+    }
+        
+    // Process output
+    cv::Mat predictedImage360;
+    int res = extractOutputs(rawPaintData, predictedImage360);
+    if (res) {
+        LogStatement("Issue with extracting outputs into HCW format");
+        return m_inputCVMat720;
+    }
+
+    cv::Mat composite = compositeOutput(predictedImage360, combinedMask, m_inputCVMat720);
+
+    return composite;
+
+}
 
 void SegPaintManager::UnloadEngines() {
 
     delete m_segmentationModel;
     delete m_IPC_connector;
 
+}
+
+SegPaintManager::~SegPaintManager() {
+    UnloadEngines();
 }

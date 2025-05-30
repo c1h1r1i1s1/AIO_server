@@ -14,7 +14,6 @@ using namespace seg;
 
 class YOLOv11_seg {
 public:
-    // Constructor/Destructor declarations (Fixed input resolution version: 360x640).
     explicit YOLOv11_seg(const std::string& engine_file_path);
     ~YOLOv11_seg();
 
