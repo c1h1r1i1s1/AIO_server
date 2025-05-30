@@ -1,3 +1,6 @@
+// This program manages the segmentation engine and the inpainting IPC connections at a high level
+// It manages the set of IDs to be removed each frame
+// It essentially controls the Diminished Reality component of this application
 #include "seg_paint_manager.hpp"
 #include "ZEDCustomManager.hpp"
 
@@ -41,7 +44,7 @@ int SegPaintManager::ProcessFrame(ZEDCustomManager* zedCustomManager) {
 
 }
 
-std::vector<DetectedObject> SegPaintManager::GetObjects() const { // Could use maxObjects
+std::vector<DetectedObject> SegPaintManager::GetObjects() const {
 
     return m_detectedObjects;
 
@@ -95,19 +98,20 @@ cv::Mat SegPaintManager::InpaintFrame(ZEDCustomManager* zedCustomManager) {
         return m_inputCVMat720;
     }
 
-    // 2. Convert the image to float and normalize pixel values to [-1, 1]
+    // Convert the image to float and normalize pixel values to [-1, 1]
     cv::Mat imageFloat;
-    m_inputCVMat720.convertTo(imageFloat, CV_32FC3, 1.0 / 127.5, -1.0);  // (img/127.5) - 1
+    m_inputCVMat720.convertTo(imageFloat, CV_32FC3, 1.0 / 127.5, -1.0);
 
     // Combine selected masks (720p)
     cv::Mat combinedMask = combineMasks(m_removal_ids, m_inputCVMat720, m_detectedMasks);
 
     imageFloat = prepareMaskedImage(imageFloat, combinedMask); // Combine mask and input
 
-    // 5. Convert the masked image to a blob with shape (1, 3, 360, 640)
+    // Convert the masked image to a blob with shape (1, 3, 360, 640)
     // blobFromImage converts from HWC (360x640x3) to CHW and adds a batch dimension.
     cv::Mat imageBlobFP32 = cv::dnn::blobFromImage(imageFloat);
 
+    // Send over IPC to inpaint manager
     cv::Mat rawPaintData;
     if (m_IPC_connector->inpaintBlob(imageBlobFP32, rawPaintData)) {
         return m_inputCVMat720;

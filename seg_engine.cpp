@@ -1,19 +1,16 @@
+// This manages the YOLO model and provides a set of functions for accessing the model I/O
 #include "seg_engine.hpp"
 #include "ZEDCustomManager.hpp"
 #include <cstring>
 #include <sstream>
 #include <filesystem>
 
-// Constructor: create the detector instance and perform initial setup.
 SegmentationModel::SegmentationModel(const std::string& engineFilePath)
 {
-    // Create the detector and load the engine.
     m_detector = new YOLOv11_seg(engineFilePath);
-    // The make_pipe call allocates buffers; 'false' means no warmup.
     m_detector->make_pipe();
 }
 
-// Destructor: release the detector.
 SegmentationModel::~SegmentationModel() {
     if (m_detector) {
         delete m_detector;
@@ -52,9 +49,17 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
         tmp.unique_object_id = sl::generate_unique_id();
         tmp.probability = obj.prob;
         tmp.label = obj.label;
+
+        // Currently set to ignore people, tables, phones and controllers
+        if (tmp.label == 0 || tmp.label == 60 || tmp.label == 65 || tmp.label == 67) {
+            continue;
+        }
+
         tmp.bounding_box_2d = convertCvRect2SdkBbox(obj.rect);
+        // Ground object if its a person
         tmp.is_grounded = (obj.label == 0);
         // others are tracked in full 3D space
+
         cvMat2slMat(obj.boxMask).copyTo(tmp.box_mask, sl::COPY_TYPE::CPU_CPU);
 
         detectedMasksPre.emplace_back();
@@ -77,6 +82,7 @@ int SegmentationModel::segmentFrame(const cv::Mat& input720,
         tmpObject.probability = objects.object_list.at(i).confidence;
         tmpObject.label = objects.object_list.at(i).raw_label;
 
+        // If bounding boxes are broken or empty, skip
         if (objects.object_list.at(i).bounding_box.size() >= 8) {
             memcpy(tmpObject.bounding_box_3d,
                 objects.object_list.at(i).bounding_box.data(),

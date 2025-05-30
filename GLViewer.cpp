@@ -1,4 +1,5 @@
-
+// This was taken from ZEDs example code for custom obejct detection
+// It visualises the point cloud in 3D space
 #include <random>
 
 #include "GLViewer.hpp"

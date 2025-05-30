@@ -1,40 +1,38 @@
+// This manages the connection to the inpainting manager process through IPC
 #include "IPC_connect.hpp"
 
 const size_t FP32_BLOB_SIZE = 1ull * 3 * 360 * 640 * sizeof(uint32_t);
 
-// Define shared memory and event names
 const wchar_t* SHARED_MEMORY_NAME = L"InpaintingSharedMemory";
 const wchar_t* EVENT_INPUT_READY = L"InputReadyEvent";
 const wchar_t* EVENT_OUTPUT_READY = L"OutputReadyEvent";
 
-// Constructor: Open the shared memory mapping and the named events.
 IPC_connect::IPC_connect() {
     // Open existing shared memory.
     hMapFile = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, SHARED_MEMORY_NAME);
     if (!hMapFile) {
         std::wcerr << L"OpenFileMappingW failed with error: " << GetLastError() << std::endl;
-        // Handle error as needed.
+        return;
     }
     // Map shared memory into our address space.
     pBuf = MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, FP32_BLOB_SIZE);
     if (!pBuf) {
         std::wcerr << L"MapViewOfFile failed with error: " << GetLastError() << std::endl;
-        // Handle error as needed.
+        return;
     }
     // Open the named events.
     hInputEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, EVENT_INPUT_READY);
     if (!hInputEvent) {
         std::wcerr << L"OpenEventW for input event failed with error: " << GetLastError() << std::endl;
-        // Handle error as needed.
+        return;
     }
     hOutputEvent = OpenEventW(SYNCHRONIZE, FALSE, EVENT_OUTPUT_READY);
     if (!hOutputEvent) {
         std::wcerr << L"OpenEventW for output event failed with error: " << GetLastError() << std::endl;
-        // Handle error as needed.
+        return;
     }
 }
 
-// Destructor: Clean up all handles.
 IPC_connect::~IPC_connect() {
     if (hInputEvent) CloseHandle(hInputEvent);
     if (hOutputEvent) CloseHandle(hOutputEvent);
@@ -43,7 +41,6 @@ IPC_connect::~IPC_connect() {
 }
 
 // inpaintBlob: Sends an input FP32 blob and receives the processed FP32 blob.
-// Both inputBlob and outputBlob are expected to have a total size of FP32_BLOB_SIZE.
 bool IPC_connect::inpaintBlob(const cv::Mat& inputBlob, cv::Mat& outputBlob) {
     // Verify input blob size.
     if (inputBlob.total() * inputBlob.elemSize() != FP32_BLOB_SIZE) {

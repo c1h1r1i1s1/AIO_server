@@ -77,12 +77,10 @@ inline cv::Mat compositeOutput(const cv::Mat& predictedImage360, cv::Mat& mask72
 {
 
     // Upscale from 360p to 720p
-    // 720p resolution is 1280x720.
     cv::Mat predictedImage720;
     cv::resize(predictedImage360, predictedImage720, cv::Size(1280, 720), 0, 0, cv::INTER_LINEAR);
-    //cv::cvtColor(predictedImage720, predictedImage720, cv::COLOR_RGB2BGR);
 
-    // --- Process and Upscale the Mask ---
+    // Process and Upscale the Mask
     if (mask720.channels() == 3)
         cv::cvtColor(mask720, mask720, cv::COLOR_BGR2GRAY);
 
@@ -91,8 +89,9 @@ inline cv::Mat compositeOutput(const cv::Mat& predictedImage360, cv::Mat& mask72
 
     cv::Mat invMask = cv::Mat::ones(mask720.size(), mask720.type()) * 255 - mask720;
 
-    // --- Composite the Inpainted Region onto the Original 720p Image ---
+    // Composite the Inpainted Region onto the Original 720p Image
     cv::Mat compositedImage = inputCVMat720.clone();
+
     // The non-zero values in mask720 indicate where to copy the predicted image.
     predictedImage720.copyTo(compositedImage, invMask);
 

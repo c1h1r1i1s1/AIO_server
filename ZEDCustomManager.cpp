@@ -1,3 +1,4 @@
+// This file manages the ZED camera, including its initialisation and frame grabbing
 #include "ZEDCustomManager.hpp"
 #include <iostream>
 #include <cstring>

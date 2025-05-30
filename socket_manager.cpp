@@ -1,3 +1,5 @@
+// This handles the connections to the headset
+// It manages a set of clients, as well as the changequeue for user object selections
 #include "socket_manager.hpp"
 #include <nlohmann/json.hpp>
 #include <set>

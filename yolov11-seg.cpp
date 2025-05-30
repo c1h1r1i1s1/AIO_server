@@ -1,3 +1,5 @@
+// This interfaces directly with the YOLO segmentation and object detection model
+// The code has been modified from ZED's yolo integration example
 #include "yolov11-seg.hpp"
 
 #include "NvInfer.h"
@@ -211,7 +213,7 @@ void YOLOv11_seg::postprocess(std::vector<seg::Object>& objs,
     // Using fixed model resolution (384×640)
     int input_h = 384;
     int input_w = 640;
-    // Assuming segmentation output is 4× downsampled
+
     int seg_h = input_h / 4;
     int seg_w = input_w / 4;
     int num_channels, num_anchors, num_classes;
