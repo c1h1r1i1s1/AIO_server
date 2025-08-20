@@ -3,9 +3,15 @@
 All-In-One (AIO) Server for Real-Time Diminished Reality and Mixed-Reality Privacy Systems.  
 This repository contains the orchestration layer that connects computer vision, inpainting, ZED stereo depth sensing, segmentation, and headset-based visualization into a single pipeline.  
 
+<p align="center">
+  <img src="media/demo.gif" alt="System Demo" width="60%"/>
+</p>
+
 The system achieves **real-time object-level privacy redaction** by managing camera inputs, running segmentation models, performing inpainting, and streaming results to a mixed-reality headset for interactive visualization.
 
-![System Component Diagram](media/System Overview.png)
+<p align="center">
+  <img src="media/System Overview.png" alt="System Overview Diagram" width="70%"/>
+</p>
 
 ---
 
@@ -88,7 +94,9 @@ Make sure to build for Release for successful compilation.
 Once the application has been launched, ensure that the inpainting server is also running, and open the application on the Quest headset to begin the selection and removal of items.
 
 ## 🔍 How It Works (Pipeline)
-![System Component Diagram](media/System Flow.png)
+<p align="center">
+  <img src="media/System Flow.png" alt="System Flow Diagram" width="80%"/>
+</p>
 
 ---
 
@@ -102,3 +110,6 @@ Once the application has been launched, ensure that the inpainting server is als
 
 ## 📜 License
 MIT License
+
+## Contact
+Please feel free to contact me if you would like assistance in setting up the pipeline locally!
