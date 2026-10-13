@@ -15,7 +15,7 @@ The system achieves **real-time object-level privacy redaction** by managing cam
 
 ---
 
-## ✨ Features & Achievements
+## Features & Achievements
 
 - **Custom ZED Camera Manager**  
   Efficiently manages stereo camera input streams, including depth maps and color frames, optimized for GPU pipelines.
@@ -40,7 +40,7 @@ The system achieves **real-time object-level privacy redaction** by managing cam
 
 ---
 
-## 🧩 Components Overview
+## Components Overview
 
 ### ZED Camera Manager
 - Interfaces with the ZED 2i/other ZED cameras.  
@@ -63,7 +63,7 @@ The system achieves **real-time object-level privacy redaction** by managing cam
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 ### Hardware
 - **NVIDIA GPU** (RTX 3070 or higher recommended).  
@@ -86,7 +86,7 @@ The system achieves **real-time object-level privacy redaction** by managing cam
 
 ---
 
-## 🚀 Running the Server
+## Running the Server
 
 The current implementation has been found to work by building using Visual Studio.
 Make sure to build for Release for successful compilation.
@@ -100,7 +100,7 @@ Once the application has been launched, ensure that the inpainting server is als
 
 ---
 
-## 🏆 Achievements
+## Achievements
 
 - End-to-end real-time privacy redaction system for mixed reality.
 - Achieved GPU-accelerated inpainting at interactive framerates (360p→720p).
@@ -108,7 +108,7 @@ Once the application has been launched, ensure that the inpainting server is als
 - Modular architecture: each component can be swapped, improved, or scaled.
 - Foundation for research into privacy-preserving MR meetings and diminished reality.
 
-## 📜 License
+## License
 MIT License
 
 ## Contact
